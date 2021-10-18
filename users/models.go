@@ -3,7 +3,7 @@ package users
 import (
 	"log"
 
-	"github.com/Andrew-Klaas/vault-go-demo-tokenization/config"
+	"github.com/Andrew-Klaas/aws-vault-go-demo-tokenization/config"
 )
 
 // //Data ...
