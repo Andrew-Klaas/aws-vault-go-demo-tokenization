@@ -94,7 +94,7 @@ func AWSLogin(authProvider, serverID, role string) (client *api.Client, token st
 	// Configuration is gathered from environment variables by upstream vault package. Environment variables like
 	// VAULT_ADDR and VAULT_SKIP_VERIFY are relevant. The VAULT_TOKEN environment variable shouldn't be needed.
 	// https://www.vaultproject.io/docs/commands#environment-variables
-	if client, err = api.NewClient(nil); err != nil {
+	if client, err = api.NewClient(&api.Config{Address: "http://hashistack-server:8200", HttpClient: httpClient}); err != nil {
 		return nil, "", nil, fmt.Errorf("failed to create Vault client: %w", err)
 	}
 
