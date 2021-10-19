@@ -4,7 +4,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/Andrew-klaas/aws-vault-go-demo-tokenization/users"
+	"github.com/Andrew-Klaas/aws-vault-go-demo-tokenization/users"
 )
 
 func main() {

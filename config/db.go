@@ -1,11 +1,6 @@
 package config
 
 import (
-
-	// "database/sql"
-	// "net/http"
-	// "github.com/vault/api"
-
 	"database/sql"
 	"fmt"
 	"io/ioutil"
@@ -18,12 +13,9 @@ import (
 
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
-	"io/ioutil"
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
-	"github.com/hashicorp/vault/api"
 )
 
 //DBuser holds DB user info
@@ -49,9 +41,11 @@ var AWSAuthRole = "auth/aws/login"
 func init() {
 	fmt.Printf("Vault client init....\n")
 
-	AWSLogin("aws", "", "my-role-iam")
-
-	Vclient.SetToken(secret.Auth.ClientToken)
+	//func AWSLogin(authProvider, serverID, role string) (client *api.Client, token string, secret *api.Secret, err error) {
+	Vclient, _, _, err := AWSLogin("aws", "", "my-role-iam")
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	//Pull dynamic database credentials
 	data, err := Vclient.Logical().Read("database/creds/vault_go_demo")
@@ -60,7 +54,8 @@ func init() {
 	}
 	username := data.Data["username"]
 	password := data.Data["password"]
-	SQLQuery := "postgres://" + username.(string) + ":" + password.(string) + "@pq-postgresql-headless.default.svc:5432/vault_go_demo?sslmode=disable"
+	//Use Consul Service Mesh (Envoy) Proxy on localhost
+	SQLQuery := "postgres://" + username.(string) + ":" + password.(string) + "@localhost:5432/vault_go_demo?sslmode=disable"
 
 	AppDBuser.Username = username.(string)
 	AppDBuser.Password = password.(string)
@@ -152,7 +147,7 @@ func AWSLogin(authProvider, serverID, role string) (client *api.Client, token st
 		return nil, "", nil, fmt.Errorf("failed to write data to Vault to get token: %w", err)
 	}
 	if secret == nil {
-		return nil, "", nil, fmt.Errorf("failed to get token from Vault: %w", ErrSecret)
+		return nil, "", nil, fmt.Errorf("failed to get token from Vault")
 	}
 
 	// Get the Vault token from the response.
