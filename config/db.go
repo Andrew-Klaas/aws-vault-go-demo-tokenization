@@ -42,7 +42,7 @@ func init() {
 	fmt.Printf("Vault client init....\n")
 
 	//func AWSLogin(authProvider, serverID, role string) (client *api.Client, token string, secret *api.Secret, err error) {
-	Vclient, _, _, err := AWSLogin("aws", "", "my-role-iam")
+	_, _, err := AWSLogin("aws", "", "my-role-iam")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -63,6 +63,7 @@ func init() {
 	//Don't do this in production!
 	fmt.Printf("\nDB Username: %v\n", AppDBuser.Username)
 	fmt.Printf("DB Password: %v\n\n", AppDBuser.Password)
+	fmt.Printf("Vault Token: %v\n\n", Vclient.Token)
 
 	//DB setup
 	DB, err = sql.Open("postgres", SQLQuery)
@@ -87,21 +88,12 @@ func init() {
 
 }
 
-func AWSLogin(authProvider, serverID, role string) (client *api.Client, token string, secret *api.Secret, err error) {
-
-	// Create the Vault client.
-	//
-	// Configuration is gathered from environment variables by upstream vault package. Environment variables like
-	// VAULT_ADDR and VAULT_SKIP_VERIFY are relevant. The VAULT_TOKEN environment variable shouldn't be needed.
-	// https://www.vaultproject.io/docs/commands#environment-variables
-	if client, err = api.NewClient(&api.Config{Address: "http://hashistack-server:8200", HttpClient: httpClient}); err != nil {
-		return nil, "", nil, fmt.Errorf("failed to create Vault client: %w", err)
-	}
+func AWSLogin(authProvider, serverID, role string) (token string, secret *api.Secret, err error) {
 
 	// Acquire an AWS session.
 	var sess *session.Session
 	if sess, err = session.NewSession(); err != nil {
-		return nil, "", nil, fmt.Errorf("failed to create AWS session: %w", err)
+		return "", nil, fmt.Errorf("failed to create AWS session: %w", err)
 	}
 
 	// Create a Go structure to talk to the AWS token service.
@@ -117,19 +109,19 @@ func AWSLogin(authProvider, serverID, role string) (client *api.Client, token st
 
 	// Sign the request to the AWS token service.
 	if err = request.Sign(); err != nil {
-		return nil, "", nil, fmt.Errorf("failed to sign AWS identity request: %w", err)
+		return "", nil, fmt.Errorf("failed to sign AWS identity request: %w", err)
 	}
 
 	// JSON marshal the headers.
 	var headers []byte
 	if headers, err = json.Marshal(request.HTTPRequest.Header); err != nil {
-		return nil, "", nil, fmt.Errorf("failed to JSON marshal HTTP headers for AWS identity request: %w", err)
+		return "", nil, fmt.Errorf("failed to JSON marshal HTTP headers for AWS identity request: %w", err)
 	}
 
 	// Read the body of the request.
 	var body []byte
 	if body, err = ioutil.ReadAll(request.HTTPRequest.Body); err != nil {
-		return nil, "", nil, fmt.Errorf("failed to JSON marshal HTTP body for AWS identity request: %w", err)
+		return "", nil, fmt.Errorf("failed to JSON marshal HTTP body for AWS identity request: %w", err)
 	}
 
 	// Create the data to write to Vault.
@@ -143,22 +135,22 @@ func AWSLogin(authProvider, serverID, role string) (client *api.Client, token st
 	path := fmt.Sprintf("auth/%s/login", authProvider)
 
 	// Write the AWS token service request to Vault.
-	if secret, err = client.Logical().Write(path, data); err != nil {
-		return nil, "", nil, fmt.Errorf("failed to write data to Vault to get token: %w", err)
+	if secret, err = Vclient.Logical().Write(path, data); err != nil {
+		return "", nil, fmt.Errorf("failed to write data to Vault to get token: %w", err)
 	}
 	if secret == nil {
-		return nil, "", nil, fmt.Errorf("failed to get token from Vault")
+		return "", nil, fmt.Errorf("failed to get token from Vault")
 	}
 
 	// Get the Vault token from the response.
 	if token, err = secret.TokenID(); err != nil {
-		return nil, "", nil, fmt.Errorf("failed to get token from Vault response: %w", err)
+		return "", nil, fmt.Errorf("failed to get token from Vault response: %w", err)
 	}
 
 	// Set the token for the client as the one it just received.
-	client.SetToken(token)
+	Vclient.SetToken(token)
 
-	return client, token, secret, nil
+	return token, secret, nil
 }
 
 // Create Table vault-go-demo (
